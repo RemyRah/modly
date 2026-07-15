@@ -177,8 +177,8 @@ This is a requirement of the MIT license attribution clause. Please keep this cr
 
 <a href="https://www.star-history.com/?repos=lightningpixel%2Fmodly&type=timeline&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=lightningpixel/modly&type=timeline&theme=dark&legend=bottom-right" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=lightningpixel/modly&type=timeline&legend=bottom-right" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=lightningpixel/modly&type=timeline&legend=bottom-right" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=lightningpixel/modly&type=timeline&theme=dark&legend=top-left&sealed_token=cOwK4zScWlXqsENFqBZjZxBegY236guAwYU7dQexei1zHYbRrqK7J5DgNqJ-826rONAWJq_iMt9w75AUW2VajCmscQbVaDifjUsqcJjc-wWVQg5SKLP6iHPv_d7Pyz2765Mjny2B3UjdFmWo-O4RKSaNvDy7m3A2BRQsFaXkEA3iyYYrO0cx6Uqv482L" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=lightningpixel/modly&type=timeline&legend=top-left&sealed_token=cOwK4zScWlXqsENFqBZjZxBegY236guAwYU7dQexei1zHYbRrqK7J5DgNqJ-826rONAWJq_iMt9w75AUW2VajCmscQbVaDifjUsqcJjc-wWVQg5SKLP6iHPv_d7Pyz2765Mjny2B3UjdFmWo-O4RKSaNvDy7m3A2BRQsFaXkEA3iyYYrO0cx6Uqv482L" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=lightningpixel/modly&type=timeline&legend=top-left&sealed_token=cOwK4zScWlXqsENFqBZjZxBegY236guAwYU7dQexei1zHYbRrqK7J5DgNqJ-826rONAWJq_iMt9w75AUW2VajCmscQbVaDifjUsqcJjc-wWVQg5SKLP6iHPv_d7Pyz2765Mjny2B3UjdFmWo-O4RKSaNvDy7m3A2BRQsFaXkEA3iyYYrO0cx6Uqv482L" />
  </picture>
 </a>
