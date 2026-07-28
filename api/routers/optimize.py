@@ -15,7 +15,7 @@ except ImportError:
 import numpy as np
 import trimesh
 import trimesh.visual
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, Response
 from pathlib import Path
 from urllib.parse import quote
