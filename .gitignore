@@ -9,13 +9,12 @@ resources/python-embed/
 resources/get-pip.py
 
 # Python
-api/__pycache__/
-api/**/__pycache__/
-api/*.pyc
-api/**/*.pyc
+__pycache__/
+**/__pycache__/
+*.pyc
+**/*.pyc
 api/.venv/
 api/venv/
-tools/modly-cli/__pycache__/
 .hermes-e2e/
 
 # Models (heavy, downloaded at runtime)
