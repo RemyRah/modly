@@ -1,12 +1,104 @@
-#!/bin/sh
-# Run the full test suite before every push; abort on any failure.
-# Bypass in a pinch with:  git push --no-verify
+#!/usr/bin/env bash
+# Pre-push guard (modly: shared RemyRah secret backstop + this repo's test gate):
+#   A. Protect 'main' from force-push / deletion.
+#   B. Secret backstop behind pre-commit — trufflehog GIT-mode scan of the pushed
+#      range (catches secrets reaching history via --no-verify or any non-hook
+#      path, incl. added-then-removed within history).
+#     B-Layer 1: filename denylist over files changed in the range.
+#     B-Layer 2: trufflehog git-mode scan of the pushed commit range.
+#   C. Test gate — run the full suite (npm test) before any push (preserved from
+#      modly's original pre-push).
+# Bypass (rare, deliberate): git push --no-verify
+set -euo pipefail
+
+RED=$'\033[31m'; YEL=$'\033[33m'; NC=$'\033[0m'
+ZERO=0000000000000000000000000000000000000000
+TOPLEVEL="$(git rev-parse --show-toplevel)"
+PROTECTED_BRANCH="main"
+BLOCKED_RE='(^|/)(\.cipher_env(\..*)?|\.cipher_token|\.credentials\.json|vault\.env)$'
+
+# --- C. Test gate (runs once, before the per-ref guard/scan loop) ---
 echo "[pre-push] Running test suite (npm test)..."
 if ! npm test; then
-  echo ""
-  echo "[pre-push] Tests failed — push aborted."
-  echo "[pre-push] Fix the tests, or bypass with: git push --no-verify"
+  echo "${RED}[pre-push] Tests failed — push aborted.${NC}" >&2
+  echo "  Fix the tests, or bypass with: git push --no-verify" >&2
   exit 1
 fi
-echo "[pre-push] All tests passed — pushing."
-exit 0
+echo "${YEL}[pre-push] Tests passed.${NC}"
+
+scan_range() {
+  # $1 = base commit (empty => scan whole branch, depth-capped), $2 = tip sha, $3 = branch name
+  local base="$1" tip="$2" branch="$3" files bad
+
+  if [ -n "$base" ]; then
+    files="$(git diff --name-only --diff-filter=ACM "$base" "$tip" 2>/dev/null || true)"
+  else
+    files="$(git ls-tree -r --name-only "$tip" 2>/dev/null || true)"
+  fi
+  bad="$(printf '%s\n' "$files" | grep -E "$BLOCKED_RE" || true)"
+  if [ -n "$bad" ]; then
+    echo "${RED}✖ pre-push: refusing to push known secret file(s):${NC}" >&2
+    printf '  %s\n' "$bad" >&2
+    echo "These belong in ~/.local/share/cipher/vault.env, never in git." >&2
+    return 1
+  fi
+
+  if ! command -v trufflehog >/dev/null 2>&1; then
+    echo "${YEL}⚠ pre-push: trufflehog not found on PATH — skipping secret scan.${NC}" >&2
+    return 0
+  fi
+  local args=(git "file://$TOPLEVEL" --no-update --fail)
+  if [ -n "$base" ]; then
+    args+=(--since-commit "$base")
+  else
+    args+=(--max-depth 200)
+  fi
+  if git rev-parse --verify -q "refs/heads/$branch" >/dev/null 2>&1; then
+    args+=(--branch "$branch")
+  fi
+  if ! trufflehog "${args[@]}" 2>/dev/null; then
+    echo "${RED}✖ pre-push: trufflehog flagged a potential secret in the pushed range.${NC}" >&2
+    echo "  Review above. False positive? Push with: git push --no-verify" >&2
+    return 1
+  fi
+  return 0
+}
+
+rc=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  branch="${remote_ref#refs/heads/}"
+
+  # --- A. force-push / deletion guard on the protected branch ---
+  if [ "$branch" = "$PROTECTED_BRANCH" ]; then
+    if [ "$local_sha" = "$ZERO" ]; then
+      echo "${RED}pre-push: refusing to delete protected branch '$branch'.${NC}" >&2
+      echo "  bypass: git push --no-verify (not recommended)" >&2
+      rc=1; continue
+    fi
+    if [ "$remote_sha" != "$ZERO" ] \
+       && ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+      echo "${RED}pre-push: refusing non-fast-forward (force) push to '$branch'.${NC}" >&2
+      echo "  bypass: git push --no-verify (not recommended)" >&2
+      rc=1; continue
+    fi
+  fi
+
+  # --- B. secret backstop over the pushed range ---
+  [ "$local_sha" = "$ZERO" ] && continue    # deletion — nothing to scan
+  lbranch="${local_ref#refs/heads/}"
+  base=""
+  if [ "$remote_sha" != "$ZERO" ]; then
+    base="$remote_sha"
+  else
+    for d in origin/main origin/master main master; do
+      if git rev-parse --verify -q "$d" >/dev/null 2>&1; then
+        mb="$(git merge-base "$d" "$local_sha" 2>/dev/null || true)"
+        [ -n "$mb" ] && { base="$mb"; break; }
+      fi
+    done
+  fi
+  scan_range "$base" "$local_sha" "$lbranch" || rc=1
+done
+
+[ "$rc" -eq 0 ] && echo "${YEL}✓ pre-push: force-push guard + secret scan clean.${NC}"
+exit "$rc"

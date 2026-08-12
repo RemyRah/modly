@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Pre-commit secret backstop (shared across RemyRah repos).
+# Layer 1: hard-block known CIPHER secret files even if force-added (git add -f).
+# Layer 2: trufflehog scan of the STAGED content only (fast; scans just the diff).
+# Bypass (rare, deliberate): git commit --no-verify
+set -euo pipefail
+
+RED=$'\033[31m'; YEL=$'\033[33m'; NC=$'\033[0m'
+
+# --- Layer 1: filename denylist (defeats `git add -f` past .gitignore) ---
+BLOCKED_RE='(^|/)(\.cipher_env(\..*)?|\.cipher_token|\.credentials\.json|vault\.env)$'
+staged="$(git diff --cached --name-only --diff-filter=ACM)"
+[ -z "$staged" ] && { echo "${YEL}✓ pre-commit: nothing staged.${NC}"; exit 0; }
+
+bad="$(printf '%s\n' "$staged" | grep -E "$BLOCKED_RE" || true)"
+if [ -n "$bad" ]; then
+  echo "${RED}✖ pre-commit: refusing to commit known secret file(s):${NC}"
+  printf '  %s\n' "$bad"
+  echo "These belong in ~/.local/share/cipher/vault.env, never in git."
+  exit 1
+fi
+
+# --- Layer 2: trufflehog scan of staged files only ---
+if ! command -v trufflehog >/dev/null 2>&1; then
+  echo "${YEL}⚠ pre-commit: trufflehog not found on PATH — skipping secret scan.${NC}"
+  exit 0
+fi
+
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+# Materialize ONLY the staged (added/copied/modified) paths, exactly as committed.
+git diff --cached --name-only --diff-filter=ACM -z \
+  | git checkout-index --stdin -z --prefix="$tmp/" 2>/dev/null || true
+
+# No --results filter: catch verified, unverified AND unknown. Most real secrets
+# (private keys, generic API keys) are "unverified" — filtering them out defeats
+# the point of a backstop. False positives are handled via `git commit --no-verify`.
+if ! trufflehog filesystem "$tmp" --no-update --fail 2>/dev/null; then
+  echo "${RED}✖ pre-commit: trufflehog flagged a potential secret in staged content.${NC}"
+  echo "Review above. If it is a false positive, commit with: git commit --no-verify"
+  exit 1
+fi
+
+echo "${YEL}✓ pre-commit: no secrets detected.${NC}"
+exit 0
